@@ -4,14 +4,10 @@
 
 #include <errno.h>
 
-#include <node.h>
-#include <node_buffer.h>
-#include <v8.h>
+#include <nan.h>
 
 #include <qrencode.h>
 #include <png.h>
-
-using namespace v8;
 
 // for compatibility with libqrencode < 3.2.0:
 #ifndef QRSPEC_VERSION_MAX
@@ -19,10 +15,11 @@ using namespace v8;
 #endif
 
 const unsigned int QRC_MAX_SIZE[] = { 2938, 2319, 1655, 1268 };
-const int WHITE = 16777216;
+const int32_t COLOR_MAX = 0xFFFFFF;
 
 struct Qrc_Params {
 	unsigned char *data;
+	size_t datalen;
 	QRecLevel ec_level;
 	QRencodeMode mode;
 	int dot_size;
@@ -31,12 +28,13 @@ struct Qrc_Params {
 	int background_color;
 	int version;
 
-	Qrc_Params(std::string p_data, QRecLevel p_ec_level = QR_ECLEVEL_L, QRencodeMode p_mode = QR_MODE_8,
+	Qrc_Params(const std::string &p_data, QRecLevel p_ec_level = QR_ECLEVEL_L, QRencodeMode p_mode = QR_MODE_8,
 			int p_version = 0,
 			int p_dot_size = 3, int p_margin = 4,
 			int p_foreground_color = 0x0, int p_background_color = 0xffffff) {
-		data = new unsigned char[p_data.length() + 1];
-		std::strncpy((char *)data, p_data.c_str(), p_data.length() + 1);
+		datalen = p_data.length();
+		data = new unsigned char[datalen + 1];
+		std::strncpy((char *)data, p_data.c_str(), datalen + 1);
 		ec_level = p_ec_level;
 		mode = p_mode;
 		version = p_version;
@@ -53,7 +51,7 @@ struct Qrc_Params {
 
 struct Qrc_Png_Buffer {
 	char *data;
-	size_t size;
+	uint32_t size;
 	Qrc_Png_Buffer() {
 		data = NULL;
 		size = 0;
@@ -63,193 +61,235 @@ struct Qrc_Png_Buffer {
 	}
 };
 
-Qrc_Params* ValidateArgs(const FunctionCallbackInfo<Value>& args) {
-	struct Qrc_Params* params;
-	Isolate *isolate = args.GetIsolate();
+Qrc_Params* ValidateArgs(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+	bool	success(false);
+	struct Qrc_Params	*params = NULL;
 
-	if (args.Length() < 1 || !args[0]->IsString()) {
-		isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "No source string given")));
-		return NULL;
+	if (info.Length() < 1 || !info[0]->IsString()) {
+		Nan::ThrowTypeError("No source string given");
+		goto out;
 	}
-	std::string data(*v8::String::Utf8Value(args[0]));
-	if (data.length() < 1 || data.length() > QRC_MAX_SIZE[0]) {
-		isolate->ThrowException(Exception::RangeError(String::NewFromUtf8(isolate, "Source string length out of range")));
-		return NULL;
-	}
-	params = new Qrc_Params(data);
+	params = new Qrc_Params(*Nan::Utf8String(info[0]));
 
-	if (args.Length() > 1) {
-		if (!args[1]->IsObject()) {
-			delete params;
-			isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Second argument must be an object")));
-			return NULL;
+	if (info.Length() > 1) {
+		if (!info[1]->IsObject()) {
+			Nan::ThrowTypeError("Second argument must be an object");
+			goto out;
 		}
-		Local<Object> paramsObj = Local<Object>::Cast(args[1]);
-		Local<Value> paramsVersion = paramsObj->Get(String::NewFromUtf8(isolate, "version"));
+		Nan::MaybeLocal<v8::Object> maybeParamsObj = Nan::To<v8::Object>(info[1]);
+		if (maybeParamsObj.IsEmpty())
+			goto out;
+		v8::Local<v8::Object> paramsObj = maybeParamsObj.ToLocalChecked();
+
+		Nan::MaybeLocal<v8::Value> maybeParamsVersion = Nan::Get(paramsObj, Nan::New("version").ToLocalChecked());
+		if (maybeParamsVersion.IsEmpty())
+			goto out;
+		v8::Local<v8::Value> paramsVersion = maybeParamsVersion.ToLocalChecked();
 		if (!paramsVersion->IsUndefined()) {
 			if (!paramsVersion->IsInt32()) {
-				delete params;
-				isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong type for version")));
-				return NULL;
-			} else if (paramsVersion->IntegerValue() < 1 || paramsVersion->IntegerValue() > QRSPEC_VERSION_MAX) {
-				delete params;
-				isolate->ThrowException(Exception::RangeError(String::NewFromUtf8(isolate, "Version out of range")));
-				return NULL;
-			} else {
-				params->version = paramsVersion->IntegerValue();
+				Nan::ThrowTypeError("Wrong type for version");
+				goto out;
 			}
+			Nan::MaybeLocal<v8::Int32> maybeVersion = Nan::To<v8::Int32>(paramsVersion);
+			if (maybeVersion.IsEmpty())
+				goto out;
+			v8::Local<v8::Int32> version = maybeVersion.ToLocalChecked();
+			if (version->Value() < 1 || version->Value() > QRSPEC_VERSION_MAX) {
+				Nan::ThrowRangeError("Version out of range");
+				goto out;
+			}
+			params->version = version->Value();
 		}
-		Local<Value> paramsEcLevel = paramsObj->Get(String::NewFromUtf8(isolate, "ecLevel"));
+
+		Nan::MaybeLocal<v8::Value> maybeParamsEcLevel = Nan::Get(paramsObj, Nan::New("ecLevel").ToLocalChecked());
+		if (maybeParamsEcLevel.IsEmpty())
+			goto out;
+		v8::Local<v8::Value> paramsEcLevel = maybeParamsEcLevel.ToLocalChecked();
 		if (!paramsEcLevel->IsUndefined()) {
 			if (!paramsEcLevel->IsInt32()) {
-				delete params;
-				isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong type for EC level")));
-				return NULL;
-			} else if (paramsEcLevel->IntegerValue() < QR_ECLEVEL_L || paramsEcLevel->IntegerValue() > QR_ECLEVEL_H) {
-				delete params;
-				isolate->ThrowException(Exception::RangeError(String::NewFromUtf8(isolate, "EC level out of range")));
-				return NULL;
-			} else {
-				params->ec_level = (QRecLevel) paramsEcLevel->IntegerValue();
-				if (data.length() > QRC_MAX_SIZE[params->ec_level]) {
-					delete params;
-					isolate->ThrowException(Exception::RangeError(String::NewFromUtf8(isolate, "Source string length out of range")));
-					return NULL;
-				}
+				Nan::ThrowTypeError("Wrong type for EC level");
+				goto out;
 			}
+			Nan::MaybeLocal<v8::Int32> maybeEcLevel = Nan::To<v8::Int32>(paramsEcLevel);
+			if (maybeEcLevel.IsEmpty())
+				goto out;
+			v8::Local<v8::Int32> ecLevel = maybeEcLevel.ToLocalChecked();
+			if (ecLevel->Value() < QR_ECLEVEL_L || ecLevel->Value() > QR_ECLEVEL_H) {
+				Nan::ThrowRangeError("EC level out of range");
+				goto out;
+			}
+			params->ec_level = (QRecLevel) ecLevel->Value();
 		}
-		Local<Value> paramsMode = paramsObj->Get(String::NewFromUtf8(isolate, "mode"));
+
+		Nan::MaybeLocal<v8::Value> maybeParamsMode = Nan::Get(paramsObj, Nan::New("mode").ToLocalChecked());
+		if (maybeParamsMode.IsEmpty())
+			goto out;
+		v8::Local<v8::Value> paramsMode = maybeParamsMode.ToLocalChecked();
 		if (!paramsMode->IsUndefined()) {
 			if (!paramsMode->IsInt32()) {
-				delete params;
-				isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong type for mode")));
-				return NULL;
-			} else if (paramsMode->IntegerValue() < QR_MODE_NUM || paramsMode->IntegerValue() > QR_MODE_KANJI) {
-				delete params;
-				isolate->ThrowException(Exception::RangeError(String::NewFromUtf8(isolate, "Mode out of range")));
-				return NULL;
-			} else {
-				params->mode = (QRencodeMode) paramsMode->IntegerValue();
-				// TODO check length of data
+				Nan::ThrowTypeError("Wrong type for mode");
+				goto out;
 			}
+			Nan::MaybeLocal<v8::Int32> maybeMode = Nan::To<v8::Int32>(paramsMode);
+			if (maybeMode.IsEmpty())
+				goto out;
+			v8::Local<v8::Int32> mode = maybeMode.ToLocalChecked();
+			if (mode->Value() < QR_MODE_NUM || mode->Value() > QR_MODE_KANJI) {
+				Nan::ThrowRangeError("Mode out of range");
+				goto out;
+			}
+			params->mode = (QRencodeMode) mode->Value();
+			// TODO check length of data
 		}
-		Local<Value> paramsDotSize = paramsObj->Get(String::NewFromUtf8(isolate, "dotSize"));
+
+		Nan::MaybeLocal<v8::Value> maybeParamsDotSize = Nan::Get(paramsObj, Nan::New("dotSize").ToLocalChecked());
+		if (maybeParamsDotSize.IsEmpty())
+			goto out;
+		v8::Local<v8::Value> paramsDotSize = maybeParamsDotSize.ToLocalChecked();
 		if (!paramsDotSize->IsUndefined()) {
 			if (!paramsDotSize->IsInt32()) {
-				delete params;
-				isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong type for dot size")));
-				return NULL;
-			} else if (paramsDotSize->IntegerValue() < 1 || paramsDotSize->IntegerValue() > 50) {
-				delete params;
-				isolate->ThrowException(Exception::RangeError(String::NewFromUtf8(isolate, "Dot size out of range")));
-				return NULL;
-			} else {
-				params->dot_size = paramsDotSize->IntegerValue();
+				Nan::ThrowTypeError("Wrong type for dot size");
+				goto out;
 			}
+			Nan::MaybeLocal<v8::Int32> maybeDotSize = Nan::To<v8::Int32>(paramsDotSize);
+			if (maybeDotSize.IsEmpty())
+				goto out;
+			v8::Local<v8::Int32> dotSize = maybeDotSize.ToLocalChecked();
+			if (dotSize->Value() < 1 || dotSize->Value() > 50) {
+				Nan::ThrowRangeError("Dot size out of range");
+				goto out;
+			}
+			params->dot_size = dotSize->Value();
 		}
-		Local<Value> paramsMargin = paramsObj->Get(String::NewFromUtf8(isolate, "margin"));
+
+		Nan::MaybeLocal<v8::Value> maybeParamsMargin = Nan::Get(paramsObj, Nan::New("margin").ToLocalChecked());
+		if (maybeParamsMargin.IsEmpty())
+			goto out;
+		v8::Local<v8::Value> paramsMargin = maybeParamsMargin.ToLocalChecked();
 		if (!paramsMargin->IsUndefined()) {
 			if (!paramsMargin->IsInt32()) {
-				delete params;
-				isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong type for margin size")));
-				return NULL;
-			} else if (paramsMargin->IntegerValue() < 0 || paramsMargin->IntegerValue() > 10) {
-				delete params;
-				isolate->ThrowException(Exception::RangeError(String::NewFromUtf8(isolate, "Margin size out of range")));
-				return NULL;
-			} else {
-				params->margin = paramsMargin->IntegerValue();
+				Nan::ThrowTypeError("Wrong type for margin size");
+				goto out;
 			}
+			Nan::MaybeLocal<v8::Int32> maybeMargin = Nan::To<v8::Int32>(paramsMargin);
+			if (maybeMargin.IsEmpty())
+				goto out;
+			v8::Local<v8::Int32> margin = maybeMargin.ToLocalChecked();
+			if (margin->Value() < 0 || margin->Value() > 10) {
+				Nan::ThrowRangeError("Margin size out of range");
+				goto out;
+			}
+			params->margin = margin->Value();
 		}
-		Local<Value> paramsFgColor = paramsObj->Get(String::NewFromUtf8(isolate, "foregroundColor"));
+
+		Nan::MaybeLocal<v8::Value> maybeParamsFgColor = Nan::Get(paramsObj, Nan::New("foregroundColor").ToLocalChecked());
+		if (maybeParamsFgColor.IsEmpty())
+			goto out;
+		v8::Local<v8::Value> paramsFgColor = maybeParamsFgColor.ToLocalChecked();
 		if (!paramsFgColor->IsUndefined()) {
 			if (!paramsFgColor->IsUint32()) {
-				delete params;
-				isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong type for foreground color")));
-				return NULL;
-			} else if (paramsFgColor->IntegerValue() < 0 || paramsFgColor->IntegerValue() >= WHITE) {
-				delete params;
-				isolate->ThrowException(Exception::RangeError(String::NewFromUtf8(isolate, "Foreground color out of range")));
-				return NULL;
-			} else {
-				params->foreground_color = paramsFgColor->IntegerValue();
+				Nan::ThrowTypeError("Wrong type for foreground color");
+				goto out;
 			}
+			Nan::MaybeLocal<v8::Uint32> maybeFgColor = Nan::To<v8::Uint32>(paramsFgColor);
+			if (maybeFgColor.IsEmpty())
+				goto out;
+			v8::Local<v8::Uint32> fgColor = maybeFgColor.ToLocalChecked();
+			if (fgColor->Value() < 0 || fgColor->Value() > COLOR_MAX) {
+				Nan::ThrowRangeError("Foreground color out of range");
+				goto out;
+			}
+			params->foreground_color = fgColor->Value();
 		}
-		Local<Value> paramsBgColor = paramsObj->Get(String::NewFromUtf8(isolate, "backgroundColor"));
+
+		Nan::MaybeLocal<v8::Value> maybeParamsBgColor = Nan::Get(paramsObj, Nan::New("backgroundColor").ToLocalChecked());
+		if (maybeParamsBgColor.IsEmpty())
+			goto out;
+		v8::Local<v8::Value> paramsBgColor = maybeParamsBgColor.ToLocalChecked();
 		if (!paramsBgColor->IsUndefined()) {
 			if (!paramsBgColor->IsUint32()) {
-				delete params;
-				isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Wrong type for background color")));
-				return NULL;
-			} else if (paramsBgColor->IntegerValue() < 0 || paramsBgColor->IntegerValue() >= WHITE) {
-				delete params;
-				isolate->ThrowException(Exception::RangeError(String::NewFromUtf8(isolate, "Background color out of range")));
-				return NULL;
-			} else {
-				params->background_color = paramsBgColor->IntegerValue();
+				Nan::ThrowTypeError("Wrong type for background color");
+				goto out;
 			}
+			Nan::MaybeLocal<v8::Uint32> maybeBgColor = Nan::To<v8::Uint32>(paramsBgColor);
+			if (maybeBgColor.IsEmpty())
+				goto out;
+			v8::Local<v8::Uint32> bgColor = maybeBgColor.ToLocalChecked();
+			if (bgColor->Value() < 0 || bgColor->Value() > COLOR_MAX) {
+				Nan::ThrowRangeError("Background color out of range");
+				goto out;
+			}
+			params->background_color = bgColor->Value();
 		}
 	}
 
-	return params;
+	if (params->datalen < 1 || params->datalen > QRC_MAX_SIZE[params->ec_level]) {
+		Nan::ThrowRangeError("Source string length out of range");
+		goto out;
+	}
+
+	success = true;
+	/* FALLTHROUGH */
+out:
+	if (!success) {
+		delete params;
+		params = NULL;
+	}
+	return (params);
 }
 
 
-QRcode* Encode(Isolate *isolate, Qrc_Params* params) {
-	QRinput *input;
-	if ((input = QRinput_new2(params->version, params->ec_level)) == NULL) {
-		if (errno == EINVAL) {
-			isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Input data is invalid")));
-			return NULL;
-		}
-		if (errno == ENOMEM) {
-			isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Not enough memory")));
-			return NULL;
-		}
-	}
-	if (QRinput_append(input, params->mode, strlen((const char *)params->data), params->data) == -1) {
-		if (errno == EINVAL) {
-			isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Input data is invalid")));
-			return NULL;
-		}
-		if (errno == ENOMEM) {
-			isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Not enough memory")));
-			return NULL;
-		}
-	}
-	QRcode *code = QRcode_encodeInput(input);
+QRcode *Encode(Qrc_Params *params) {
+	// reset errno, so the caller is able to distinguish distinct error cases.
+	errno = 0;
+	QRcode	*code  = NULL;
+	QRinput	*input = NULL;
+
+	input = QRinput_new2(params->version, params->ec_level);
+	if (input == NULL)
+		goto out;
+	if (QRinput_append(input, params->mode, params->datalen, params->data) == -1)
+		goto out;
+	code = QRcode_encodeInput(input);
+
+	/* FALLTHROUGH */
+out:
 	QRinput_free(input);
-
-	if (code == NULL) {
-		isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "Could not encode input")));
-		return NULL;
-	}
-
-	return code;
+	return (code);
 }
 
 
-void EncodeBuf(const FunctionCallbackInfo<Value>& args) {
-	Isolate *isolate = args.GetIsolate();
-	HandleScope scope(isolate);
-	Local<Object> codeObj = Object::New(isolate);
+void EncodeBuf(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+	v8::Local<v8::Object> obj = Nan::New<v8::Object>();
+	QRcode *code = NULL;
 
-	Qrc_Params* params = ValidateArgs(args);
-	if (!params) {
-		args.GetReturnValue().Set(codeObj);
-		return;
-	}
+	Qrc_Params *params = ValidateArgs(info);
+	if (!params)
+		goto out;
 
-	QRcode* code = Encode(isolate, params);
+	code = Encode(params);
 	delete params;
-	if (code) {
-		codeObj->Set(String::NewFromUtf8(isolate, "width", String::kInternalizedString), Integer::New(isolate, code->width));
-		codeObj->Set(String::NewFromUtf8(isolate, "version", String::kInternalizedString), Integer::New(isolate, code->version));
-		Local<Object> buffer = node::Buffer::New(isolate, (const char*)code->data, code->width * code->width);
-		codeObj->Set(String::NewFromUtf8(isolate, "data", String::kInternalizedString), buffer);
-		QRcode_free(code);
+	if (code == NULL) {
+		if (errno == EINVAL) {
+			Nan::ThrowError("Input data is invalid");
+		} else if (errno == ENOMEM) {
+			Nan::ThrowError("Not enough memory");
+		} else {
+			Nan::ThrowError("Could not encode input");
+		}
+	} else {
+		// XXX: overflow check on (code->width * code->width) ?
+		Nan::MaybeLocal<v8::Object> maybeBuffer = Nan::CopyBuffer((const char *)code->data, code->width * code->width);
+		if (!maybeBuffer.IsEmpty()) {
+			Nan::Set(obj, Nan::New("data").ToLocalChecked(), maybeBuffer.ToLocalChecked());
+			Nan::Set(obj, Nan::New("width").ToLocalChecked(),   Nan::New(code->width));
+			Nan::Set(obj, Nan::New("version").ToLocalChecked(), Nan::New(code->version));
+		}
 	}
-	args.GetReturnValue().Set(codeObj);
+	/* FALLTHROUGH */
+out:
+	QRcode_free(code);
+	info.GetReturnValue().Set(obj);
 }
 
 
@@ -270,19 +310,25 @@ void Qrc_png_write_buffer(png_structp png_ptr, png_bytep data, png_size_t length
 }
 
 
-void EncodePNG(const FunctionCallbackInfo<Value>& args) {
-	Isolate *isolate = args.GetIsolate();
-	HandleScope scope(isolate);
-	Local<Object> obj = Object::New(isolate);
+void EncodePNG(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+	v8::Local<v8::Object> obj = Nan::New<v8::Object>();
 
-	Qrc_Params* params = ValidateArgs(args);
+	Qrc_Params* params = ValidateArgs(info);
 	if (!params) {
-		args.GetReturnValue().Set(obj);
+		info.GetReturnValue().Set(obj);
 		return;
 	}
 
-	QRcode *code = Encode(isolate, params);
-	if (code) {
+	QRcode *code = Encode(params);
+	if (code == NULL) {
+		if (errno == EINVAL) {
+			Nan::ThrowError("Input data is invalid");
+		} else if (errno == ENOMEM) {
+			Nan::ThrowError("Not enough memory");
+		} else {
+			Nan::ThrowError("Could not encode input");
+		}
+	} else {
 		Qrc_Png_Buffer* bp = new Qrc_Png_Buffer();
 
 		png_structp png_ptr;
@@ -294,7 +340,7 @@ void EncodePNG(const FunctionCallbackInfo<Value>& args) {
 		if (!png_ptr) {
 			delete params;
 			QRcode_free(code);
-			args.GetReturnValue().Set(obj);
+			info.GetReturnValue().Set(obj);
 			return;
 		}
 
@@ -303,7 +349,7 @@ void EncodePNG(const FunctionCallbackInfo<Value>& args) {
 			png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
 			delete params;
 			QRcode_free(code);
-			args.GetReturnValue().Set(obj);
+			info.GetReturnValue().Set(obj);
 			return;
 		}
 
@@ -311,7 +357,7 @@ void EncodePNG(const FunctionCallbackInfo<Value>& args) {
 			png_destroy_write_struct(&png_ptr, &info_ptr);
 			delete params;
 			QRcode_free(code);
-			args.GetReturnValue().Set(obj);
+			info.GetReturnValue().Set(obj);
 			return;
 		}
 
@@ -358,20 +404,24 @@ void EncodePNG(const FunctionCallbackInfo<Value>& args) {
 		delete[] row;
 		free(png_plte);
 
-		obj->Set(String::NewFromUtf8(isolate, "width", String::kInternalizedString), Integer::New(isolate, code->width));
-		obj->Set(String::NewFromUtf8(isolate, "version", String::kInternalizedString), Integer::New(isolate, code->version));
-		Local<Object> buffer = node::Buffer::New(isolate, bp->data, bp->size);
-		obj->Set(String::NewFromUtf8(isolate, "data", String::kInternalizedString), buffer);
+		Nan::MaybeLocal<v8::Object> maybeBuffer = Nan::CopyBuffer(bp->data, bp->size);
+		if (!maybeBuffer.IsEmpty()) {
+			Nan::Set(obj, Nan::New("data").ToLocalChecked(), maybeBuffer.ToLocalChecked());
+			Nan::Set(obj, Nan::New("width").ToLocalChecked(),   Nan::New(code->width));
+			Nan::Set(obj, Nan::New("version").ToLocalChecked(), Nan::New(code->version));
+		}
 		QRcode_free(code);
 		delete bp;
 	}
 	delete params;
-	args.GetReturnValue().Set(obj);
+	info.GetReturnValue().Set(obj);
 }
 
-void init(Handle<Object> exports) {
-	NODE_SET_METHOD(exports, "encode", EncodeBuf);
-	NODE_SET_METHOD(exports, "encodePng", EncodePNG);
+void Init(v8::Local<v8::Object> exports) {
+	exports->Set(Nan::New("encode").ToLocalChecked(),
+	    Nan::New<v8::FunctionTemplate>(EncodeBuf)->GetFunction());
+	exports->Set(Nan::New("encodePng").ToLocalChecked(),
+	    Nan::New<v8::FunctionTemplate>(EncodePNG)->GetFunction());
 }
 
-NODE_MODULE(qrc, init)
+NODE_MODULE(qrc, Init)
