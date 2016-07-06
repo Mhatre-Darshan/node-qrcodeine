@@ -187,14 +187,14 @@ Qrc_Params* ValidateArgs(const Nan::FunctionCallbackInfo<v8::Value>& info) {
 			goto out;
 		v8::Local<v8::Value> paramsFgColor = maybeParamsFgColor.ToLocalChecked();
 		if (!paramsFgColor->IsUndefined()) {
-			if (!paramsFgColor->IsUint32()) {
+			if (!paramsFgColor->IsInt32()) {
 				Nan::ThrowTypeError("Wrong type for foreground color");
 				goto out;
 			}
-			Nan::MaybeLocal<v8::Uint32> maybeFgColor = Nan::To<v8::Uint32>(paramsFgColor);
+			Nan::MaybeLocal<v8::Int32> maybeFgColor = Nan::To<v8::Int32>(paramsFgColor);
 			if (maybeFgColor.IsEmpty())
 				goto out;
-			v8::Local<v8::Uint32> fgColor = maybeFgColor.ToLocalChecked();
+			v8::Local<v8::Int32> fgColor = maybeFgColor.ToLocalChecked();
 			if (fgColor->Value() < 0 || fgColor->Value() > COLOR_MAX) {
 				Nan::ThrowRangeError("Foreground color out of range");
 				goto out;
@@ -207,14 +207,14 @@ Qrc_Params* ValidateArgs(const Nan::FunctionCallbackInfo<v8::Value>& info) {
 			goto out;
 		v8::Local<v8::Value> paramsBgColor = maybeParamsBgColor.ToLocalChecked();
 		if (!paramsBgColor->IsUndefined()) {
-			if (!paramsBgColor->IsUint32()) {
+			if (!paramsBgColor->IsInt32()) {
 				Nan::ThrowTypeError("Wrong type for background color");
 				goto out;
 			}
-			Nan::MaybeLocal<v8::Uint32> maybeBgColor = Nan::To<v8::Uint32>(paramsBgColor);
+			Nan::MaybeLocal<v8::Int32> maybeBgColor = Nan::To<v8::Int32>(paramsBgColor);
 			if (maybeBgColor.IsEmpty())
 				goto out;
-			v8::Local<v8::Uint32> bgColor = maybeBgColor.ToLocalChecked();
+			v8::Local<v8::Int32> bgColor = maybeBgColor.ToLocalChecked();
 			if (bgColor->Value() < 0 || bgColor->Value() > COLOR_MAX) {
 				Nan::ThrowRangeError("Background color out of range");
 				goto out;

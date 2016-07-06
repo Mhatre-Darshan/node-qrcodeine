@@ -139,7 +139,7 @@ suite('Validation of input params', function () {
       function () {
         qr.encode('TEST', { foregroundColor: -1 });
       },
-      /Wrong type for foreground color/
+      /Foreground color out of range/
     );
     assert.throws(
       function () {
@@ -162,7 +162,7 @@ suite('Validation of input params', function () {
       function () {
         qr.encode('TEST', { backgroundColor: -1 });
       },
-      /Wrong type for background color/
+      /Background color out of range/
     );
     assert.throws(
       function () {
