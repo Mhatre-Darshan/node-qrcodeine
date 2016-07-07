@@ -17,6 +17,7 @@ install:
     - export CXX=g++-4.8
     - $CXX --version
     - npm install
-    - node-gyp rebuild
+    - npm install node-gyp
+    - ./node_modules/.bin/node-gyp rebuild
 
 script: npm test
