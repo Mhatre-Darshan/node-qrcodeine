@@ -35,5 +35,10 @@
   },
   "devDependencies": {
     "mocha": "2.5.3"
-  }
+  },
+  "contributors": [
+    "Tobias Muellerleile <muellerleile@hrz.uni-marburg.de> (https://github.com/tmuellerleile)",
+    "Alexandre Perrin <alexandre.perrin@netoxygen.ch> (https://github.com/kAworu)",
+    "Robin Hahling <robin.hahling@gw-computing.net> (https://github.com/Rolinh)"
+  ]
 }
