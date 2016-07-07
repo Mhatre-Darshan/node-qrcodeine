@@ -1,12 +1,12 @@
 node-qrcodeine
 ==============
-QR Code generator for Node.js using `libqrencode` and `libpng`. This Node.js
-module is a fork from [qrc](https://www.npmjs.com/package/qrc) which brings it
-to Node.js v0.12.x and adds some customizations.
+QR Code generator for Node.js using `libqrencode` and `libpng`. This module is
+a fork from [qrc](https://www.npmjs.com/package/qrc) to bring support for
+Node.js versions beyond 0.10.x and full control over the QR generation.
 
-As opposed to many QR code generators, `qrcodeine` can be passed very specific
-options, including not only the error correction level or the QR code version
-but also the QR code mode (numeral, alphanumeric, 8-bit binary, Kanji).
+`qrcodeine` support various settings not usually found in other Node.js QR code
+modules like error correction level, version, mode (numeral, alphanumeric,
+8-bit binary, Kanji), etc.
 
 Requirements
 ------------
@@ -20,8 +20,8 @@ your choice.
 
 2) `npm install qrcodeine`
 
-Usage
------
+Usage Example
+-------------
 
     var qr = require('qrcodeine');
 
