@@ -10,7 +10,4 @@ addons:
             - libpng12-0
             - libpng12-dev
 
-before_install:
-    - $CXX --version
-
 dist: trusty
