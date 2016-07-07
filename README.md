@@ -40,9 +40,9 @@ Usage
       backgroundColor: 0x00FF00
     });
 
-### Options
-
-`version` – *Minimum* version of QR Code, valid values: 1-41, 0 = auto
+Options
+-------
+`version` – *Minimum* version of QR Code, valid values: 1-40, 0 = auto
 [default]
 
 `ecLevel` – error correction level, valid values: EC_L (lowest [default]) –
