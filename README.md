@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/NetOxygen/node-qrcodeine.svg?branch=master)](https://travis-ci.org/NetOxygen/node-qrcodeine)
+
 node-qrcodeine
 ==============
 QR Code generator for Node.js using `libqrencode` and `libpng`. This module is
