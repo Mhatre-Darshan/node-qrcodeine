@@ -7,6 +7,9 @@
     "test": "node-gyp configure build && ./node_modules/.bin/mocha",
     "prepublish": "rm -r build || (exit 0)"
   },
+  "engines": {
+      "node": ">= 0.12.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/netoxygen/node-qrcodeine.git"
