@@ -4,10 +4,19 @@ node_js: ["0.12", "4", "6"]
 
 addons:
     apt:
+        sources:
+            - ubuntu-toolchain-r-test
         packages:
+            - g++-4.8
             - libqrencode3
             - libqrencode-dev
             - libpng12-0
             - libpng12-dev
 
-dist: trusty
+install:
+    - export CXX=g++-4.8
+    - $CXX --version
+    - npm install
+    - node-gyp rebuild
+
+script: npm test
