@@ -74,7 +74,7 @@ License
 -------
 Copyright (C) 2013 Tobias Muellerleile <muellerleile@hrz.uni-marburg.de>
 
-Copyright (C) 2015 Net Oxygen Sàrl <info@netoxygen.ch>
+Copyright (C) 2015 — 2016 Net Oxygen Sàrl <info@netoxygen.ch>
 
 This library is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
