@@ -1,4 +1,5 @@
-[![Build Status](https://travis-ci.org/NetOxygen/node-qrcodeine.svg?branch=master)](https://travis-ci.org/NetOxygen/node-qrcodeine)
+[![NPM Version][npm-image]][npm-url]
+[![Build Status][travis-image]][travis-url]
 
 node-qrcodeine
 ==============
@@ -105,3 +106,8 @@ PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
 You should have received a copy of the GNU Lesser General Public License along
 with this library; if not, write to the Free Software Foundation, Inc., 51
 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+
+[npm-image]: https://img.shields.io/npm/v/qrcodeine.svg
+[npm-url]: https://npmjs.org/package/qrcodeine
+[travis-image]: https://travis-ci.org/NetOxygen/node-qrcodeine.svg?branch=master
+[travis-url]: https://travis-ci.org/NetOxygen/node-qrcodeine
