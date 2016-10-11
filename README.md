@@ -1,5 +1,6 @@
 [![NPM Version][npm-image]][npm-url]
 [![Build Status][travis-image]][travis-url]
+[![Test Coverage][coveralls-image]][coveralls-url]
 
 node-qrcodeine
 ==============
@@ -111,3 +112,5 @@ Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 [npm-url]: https://npmjs.org/package/qrcodeine
 [travis-image]: https://travis-ci.org/NetOxygen/node-qrcodeine.svg?branch=master
 [travis-url]: https://travis-ci.org/NetOxygen/node-qrcodeine
+[coveralls-image]: https://coveralls.io/repos/github/NetOxygen/node-qrcodeine/badge.svg?branch=master
+[coveralls-url]: https://coveralls.io/github/NetOxygen/node-qrcodeine?branch=master
