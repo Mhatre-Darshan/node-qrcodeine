@@ -67,6 +67,22 @@ valid values: 0-10 (default: 4)
 
 \* = PNG encoding only
 
+Tests
+-----
+
+To run the test suite, first install the dependencies, then run `npm test`:
+
+```sh
+$ npm install
+$ npm test
+```
+
+For a test coverage report, run `npm test --coverage`:
+
+```sh
+$ npm test --coverage
+```
+
 Legal
 -----
 QR Code is a registered trademark of
