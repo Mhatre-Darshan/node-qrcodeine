@@ -31,12 +31,12 @@
   "license": "LGPL-2.1",
   "gypfile": true,
   "dependencies": {
-    "bindings": "^1.2.1",
-    "nan": "^2.4.0"
+    "bindings": "~1.2.1",
+    "nan": "^2.6.2"
   },
   "devDependencies": {
     "istanbul": "^0.4.5",
-    "mocha": "^3.1.2"
+    "mocha": "3.4.2"
   },
   "contributors": [
     "Tobias Muellerleile <muellerleile@hrz.uni-marburg.de> (https://github.com/tmuellerleile)",
